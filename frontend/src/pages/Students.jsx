@@ -2,37 +2,28 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { ErrorBanner, useError } from '../components/ErrorBanner.jsx';
 import { LoadingOverlay } from '../components/LoadingOverlay.jsx';
+import { useDataFetch } from '../hooks/useDataFetch.js';
 
 const EMPTY = { student_id: '', name: '', email: '', department: '', level: '' };
 
 export default function Students() {
-  const [list, setList] = useState([]);
+  const { data: list, loading: dataLoading, error, refetch, setData } = useDataFetch(() => api.listStudents(), 5000); // Auto-refresh every 5 seconds
   const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
-  const [dataLoading, setDataLoading] = useState(true);
+  const { handleError, clear } = useError();
   
-  const { error, handleError, clear } = useError();
-
-  const load = async () => {
-    try {
-      const data = await api.listStudents();
-      setList(data);
-    } catch (e) {
-      handleError(e);
-    }
-  };
-
-  useEffect(() => { 
-    load().finally(() => setDataLoading(false)); 
-  }, []);
+  // Merge custom errors with hook errors
+  const displayError = error?.message ? error : error;
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    clear();
     try {
       await api.createStudent(form);
       setForm(EMPTY);
-      await load();
+      // Refresh data immediately
+      await refetch();
     } catch (e) {
       handleError(e);
     } finally {
@@ -44,7 +35,8 @@ export default function Students() {
     if (!confirm('Delete this student?')) return;
     try {
       await api.deleteStudent(id);
-      await load();
+      // Refresh data immediately after deletion
+      await refetch();
     } catch (e) {
       handleError(e);
     }

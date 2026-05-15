@@ -7,6 +7,12 @@ const H = {
   'Prefer': 'return=representation'
 };
 
+// DELETE requests must NOT include 'Prefer: return=representation' —
+// on some Supabase configs it causes the gateway to drop the apikey header.
+const H_DEL = {
+  'apikey': KEY,
+  'Authorization': `Bearer ${KEY}`,
+};
 
 async function checkOk(res) {
   if (res.ok) return res.json();
@@ -35,23 +41,24 @@ export const api = {
       method: 'PATCH', headers: H, body: JSON.stringify(data)
     }).then(checkOk),
 
-  deleteStudent: (id) =>
-    fetch(`${URL}/students?id=eq.${id}`, {
-      method: 'DELETE', headers: H
-    }).then(r => { if (!r.ok) throw new Error(`Delete failed (${r.status})`); return true; }),
+  deleteStudent: async (id) => {
+    return fetch(`${URL}/students?id=eq.${id}`, {
+      method: 'DELETE', headers: H_DEL
+    }).then(async r => {
+      if (r.ok) return true;
+      let msg = `Delete failed (${r.status})`;
+      try {
+        const body = await r.json();
+        msg = body.message || body.hint || body.details || msg;
+      } catch (_) { /* ignore parse errors */ }
+      throw new Error(msg);
+    });
+  },
 
-  // // ── Books ────────────────────────────────────────────────────────────────────
-  // listBooks: () =>
-  //   fetch(`${URL}/books?order=id.desc`, { headers: H }).then(checkOk),
-
-  // createBook: ({ title, author, category, total_copies }) =>
-  //   fetch(`${URL}/books`, {
-  //     method: 'POST', headers: H,
-  //     body: JSON.stringify({ title, author, category, total_copies, available_copies: total_copies })
-  //   }).then(checkOk),
-   listBooks: () =>
+  // ── Books ────────────────────────────────────────────────────────────────────
+  listBooks: () =>
     fetch(`${URL}/books?order=id.desc`, { headers: H }).then(checkOk),
- 
+
   createBook: ({ title, author, category, total_copies, file_url }) =>
     fetch(`${URL}/books`, {
       method: 'POST', headers: H,
@@ -67,10 +74,19 @@ export const api = {
       method: 'PATCH', headers: H, body: JSON.stringify(data)
     }).then(checkOk),
 
-  deleteBook: (id) =>
-    fetch(`${URL}/books?id=eq.${id}`, {
-      method: 'DELETE', headers: H
-    }).then(r => { if (!r.ok) throw new Error(`Delete failed (${r.status})`); return true; }),
+  deleteBook: async (id) => {
+    return fetch(`${URL}/books?id=eq.${id}`, {
+      method: 'DELETE', headers: H_DEL
+    }).then(async r => {
+      if (r.ok) return true;
+      let msg = `Delete failed (${r.status})`;
+      try {
+        const body = await r.json();
+        msg = body.message || body.hint || body.details || msg;
+      } catch (_) { /* ignore parse errors */ }
+      throw new Error(msg);
+    });
+  },
 
   // ── Loans ────────────────────────────────────────────────────────────────────
   listLoans: () =>

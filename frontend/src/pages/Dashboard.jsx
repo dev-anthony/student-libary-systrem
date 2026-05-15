@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { ErrorBanner, useError } from '../components/ErrorBanner.jsx';
 import { LoadingOverlay } from '../components/LoadingOverlay.jsx';
@@ -22,17 +22,14 @@ const ACCEPTED = [
 async function uploadToSupabase(file) {
   const safeName = file.name.replace(/[^a-z0-9.\-_]/gi, '_');
   const filename = `${Date.now()}_${safeName}`;
-
-  // Strip any trailing path (e.g. /rest/v1) — we only want https://xxx.supabase.co
   const base = SUPABASE_URL.replace(/\/(rest|storage)\/.*$/, '');
-
   const res = await fetch(
     `${base}/storage/v1/object/${BUCKET}/${filename}`,
     {
       method: 'POST',
       headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
         'Content-Type': file.type || 'application/octet-stream',
         'x-upsert': 'true',
       },
@@ -61,12 +58,14 @@ function fileLabel(url) {
 }
 
 const NAV = [
-  { key: 'overview',  label: 'Overview',     icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-  { key: 'students',  label: 'Students',      icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-  { key: 'books',     label: 'Books',         icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
-  { key: 'loans',     label: 'Loans',         icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-  { key: 'available', label: 'Availability',  icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { key: 'overview',  label: 'Overview',    icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+  { key: 'students',  label: 'Students',    icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+  { key: 'books',     label: 'Books',       icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+  { key: 'loans',     label: 'Loans',       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+  { key: 'available', label: 'Availability', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
 ];
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function Icon({ path, className = 'w-5 h-5' }) {
   return (
@@ -83,10 +82,9 @@ function StatusBadge({ status, overdue }) {
 }
 
 function AvailBadge({ pct }) {
-  if (pct === 0) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200">Issued out</span>;
-  if (pct > 50)  return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 ring-1 ring-green-200">{pct}%</span>;
-  if (pct > 20)  return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">{pct}%</span>;
-  return                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200">{pct}%</span>;
+  if (pct > 50) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 ring-1 ring-green-200">{pct}%</span>;
+  if (pct > 20) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">{pct}%</span>;
+  return               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200">{pct}%</span>;
 }
 
 function Modal({ isOpen, title, onClose, children, onSubmit, submitText = 'Submit', isLoading = false }) {
@@ -111,6 +109,28 @@ function Modal({ isOpen, title, onClose, children, onSubmit, submitText = 'Submi
   );
 }
 
+/** Simple confirm dialog so we don't rely on window.confirm */
+function ConfirmDialog({ isOpen, message, onConfirm, onCancel, isLoading }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 w-full max-w-sm mx-4 p-6 space-y-4">
+        <p className="text-sm text-gray-700">{message}</p>
+        <div className="flex gap-3 justify-end">
+          <button onClick={onCancel} disabled={isLoading}
+            className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={isLoading}
+            className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50">
+            {isLoading ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const fmt = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 function buildChartData(loans) {
@@ -126,42 +146,71 @@ function buildChartData(loans) {
   return Object.entries(months).slice(-8).map(([name, v]) => ({ name, ...v }));
 }
 
+const VALID_TABS = NAV.map(n => n.key);
+const TAB_KEY = 'libraryms_active_tab';
+
 const INPUT_CLS  = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400';
 const SELECT_CLS = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white';
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
+  // ── Tab persistence ────────────────────────────────────────────────────────
+  const [tab, setTab] = useState(() => {
+    try {
+      const saved = localStorage.getItem(TAB_KEY);
+      return saved && VALID_TABS.includes(saved) ? saved : 'overview';
+    } catch { return 'overview'; }
+  });
+
   const [students, setStudents] = useState([]);
   const [books,    setBooks]    = useState([]);
   const [loans,    setLoans]    = useState([]);
-  const [tab,      setTab]      = useState('overview');
   const [sidebar,  setSidebar]  = useState(false);
   const [loading,  setLoading]  = useState(true);
 
-  const [modals,        setModals]        = useState({ addStudent: false, addBook: false, issueLoan: false, returnLoan: false });
+  const [modals, setModals] = useState({
+    addStudent: false, addBook: false, issueLoan: false, returnLoan: false,
+  });
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Delete confirmation state
+  const [deleteTarget,  setDeleteTarget]  = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [studentForm, setStudentForm] = useState({ student_id: '', name: '', email: '', department: '', level: '' });
   const [bookForm,    setBookForm]    = useState({ title: '', author: '', category: '', total_copies: 1 });
   const [loanForm,    setLoanForm]    = useState({ student_id: '', book_id: '', issue_date: '', due_date: '' });
   const [returnForm,  setReturnForm]  = useState({ loan_id: '' });
 
-  // File upload state for Add Book modal
-  const [bookFile,    setBookFile]    = useState(null);
-  const [uploadPct,   setUploadPct]   = useState(null);
+  const [bookFile,  setBookFile]  = useState(null);
+  const [uploadPct, setUploadPct] = useState(null);
   const bookFileRef = useRef();
 
   const { error: loadError,   handleError: handleLoadError,   clear: clearLoadError   } = useError();
   const { error: actionError, handleError: handleActionError, clear: clearActionError } = useError();
 
-  const loadData = async () => {
+  // ── Data fetching ──────────────────────────────────────────────────────────
+  // loadData is called once on mount, then again after every mutation so
+  // the UI always reflects the latest server state immediately.
+  const loadData = useCallback(async () => {
     try {
-      const [st, bk, ln] = await Promise.all([api.listStudents(), api.listBooks(), api.listLoans()]);
+      const [st, bk, ln] = await Promise.all([
+        api.listStudents(), api.listBooks(), api.listLoans(),
+      ]);
       setStudents(st); setBooks(bk); setLoans(ln);
     } catch (e) { handleLoadError(e); }
-  };
+  }, []);
 
-  useEffect(() => { loadData().finally(() => setLoading(false)); }, []);
+  // Initial load only — no polling. Every mutation calls loadData() itself.
+  useEffect(() => { loadData().finally(() => setLoading(false)); }, [loadData]);
 
+  // ── Persist active tab ─────────────────────────────────────────────────────
+  useEffect(() => {
+    try { localStorage.setItem(TAB_KEY, tab); } catch { /* ignore */ }
+  }, [tab]);
+
+  // ── Derived state ──────────────────────────────────────────────────────────
   const stats = {
     students: students.length,
     books:    books.reduce((a, b) => a + b.total_copies, 0),
@@ -185,24 +234,26 @@ export default function Dashboard() {
   const availableBooks   = booksWithMeta.filter(b => !b.unavailable);
   const unavailableBooks = booksWithMeta.filter(b =>  b.unavailable);
 
+  // ── Navigation ─────────────────────────────────────────────────────────────
   const changeTab  = (key)  => { setTab(key); setSidebar(false); };
   const openModal  = (name) => { clearActionError(); setModals(m => ({ ...m, [name]: true  })); };
   const closeModal = (name) => {
     clearActionError();
     setModals(m => ({ ...m, [name]: false }));
     if (name === 'addBook') {
-      setBookFile(null);
-      setUploadPct(null);
+      setBookFile(null); setUploadPct(null);
       if (bookFileRef.current) bookFileRef.current.value = '';
     }
   };
 
+  // ── Handlers: Add ──────────────────────────────────────────────────────────
   const handleAddStudent = async (e) => {
     e.preventDefault(); setActionLoading(true);
     try {
       await api.createStudent(studentForm);
       setStudentForm({ student_id: '', name: '', email: '', department: '', level: '' });
-      closeModal('addStudent'); await loadData();
+      closeModal('addStudent');
+      await loadData();
     } catch (e) { handleActionError(e); }
     finally { setActionLoading(false); }
   };
@@ -211,17 +262,13 @@ export default function Dashboard() {
     e.preventDefault(); setActionLoading(true);
     try {
       let file_url = null;
-      if (bookFile) {
-        setUploadPct(20);
-        file_url = await uploadToSupabase(bookFile);
-        setUploadPct(100);
-      }
+      if (bookFile) { setUploadPct(20); file_url = await uploadToSupabase(bookFile); setUploadPct(100); }
       await api.createBook({ ...bookForm, total_copies: Number(bookForm.total_copies) || 1, file_url });
       setBookForm({ title: '', author: '', category: '', total_copies: 1 });
-      setBookFile(null);
-      setUploadPct(null);
+      setBookFile(null); setUploadPct(null);
       if (bookFileRef.current) bookFileRef.current.value = '';
-      closeModal('addBook'); await loadData();
+      closeModal('addBook');
+      await loadData();
     } catch (e) { handleActionError(e); }
     finally { setActionLoading(false); }
   };
@@ -250,7 +297,8 @@ export default function Dashboard() {
         due_date:   loanForm.due_date,
       });
       setLoanForm({ student_id: '', book_id: '', issue_date: '', due_date: '' });
-      closeModal('issueLoan'); await loadData();
+      closeModal('issueLoan');
+      await loadData();
     } catch (e) { handleActionError(e); }
     finally { setActionLoading(false); }
   };
@@ -262,17 +310,46 @@ export default function Dashboard() {
       if (loan) {
         await api.returnLoan(loan.id, new Date().toISOString().slice(0, 10));
         setReturnForm({ loan_id: '' });
-        closeModal('returnLoan'); await loadData();
+        closeModal('returnLoan');
+        await loadData();
       }
     } catch (e) { handleActionError(e); }
     finally { setActionLoading(false); }
   };
 
+  // ── Handlers: Delete ───────────────────────────────────────────────────────
+  const askDelete    = (type, id, label) => setDeleteTarget({ type, id, label });
+  const cancelDelete = () => setDeleteTarget(null);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      if (deleteTarget.type === 'student') await api.deleteStudent(deleteTarget.id);
+      if (deleteTarget.type === 'book')    await api.deleteBook(deleteTarget.id);
+      setDeleteTarget(null);
+      await loadData();
+    } catch (e) { handleLoadError(e); setDeleteTarget(null); }
+    finally { setDeleteLoading(false); }
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
       {loading && <LoadingOverlay />}
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        message={`Are you sure you want to delete ${deleteTarget?.label ?? 'this record'}? This action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        isLoading={deleteLoading}
+      />
+
       {sidebar && <div className="fixed inset-0 bg-black/30 z-20 lg:hidden" onClick={() => setSidebar(false)} />}
 
+      {/* ── Sidebar ───────────────────────────────────────────────────────── */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-100
         shadow-xl lg:shadow-none flex flex-col transition-transform duration-200
@@ -305,6 +382,7 @@ export default function Dashboard() {
         </div>
       </aside>
 
+      {/* ── Main ──────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-5 flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -315,12 +393,12 @@ export default function Dashboard() {
             </button>
             <h1 className="text-base font-semibold text-gray-900">{NAV.find(n => n.key === tab)?.label}</h1>
           </div>
-          {loading && <span className="text-xs text-gray-400 animate-pulse">Loading data…</span>}
         </header>
 
         <main className="flex-1 overflow-y-auto p-5 space-y-5">
           {loadError && <ErrorBanner error={loadError} onDismiss={clearLoadError} />}
 
+          {/* ── Overview ──────────────────────────────────────────────────── */}
           {tab === 'overview' && (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -364,6 +442,7 @@ export default function Dashboard() {
               </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                {/* Students preview */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Students</p>
@@ -393,6 +472,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {/* Books preview */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Books</p>
@@ -425,6 +505,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {/* Active loans preview */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Active Loans</p>
@@ -458,6 +539,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {/* Availability preview */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Book Availability</p>
@@ -497,6 +579,7 @@ export default function Dashboard() {
             </>
           )}
 
+          {/* ── Students tab ──────────────────────────────────────────────── */}
           {tab === 'students' && (
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -506,10 +589,10 @@ export default function Dashboard() {
                 </div>
                 <button onClick={() => openModal('addStudent')} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">+ Add Student</button>
               </div>
-              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+              <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="bg-gray-50/70 border-b border-gray-100">
-                    {['Student ID','Name','Email','Department','Level','Actions'].map(h => (
+                    {['Student ID', 'Name', 'Email', 'Department', 'Level', 'Actions'].map(h => (
                       <th key={h} className="text-left text-xs font-medium text-gray-400 uppercase tracking-wide px-5 py-3">{h}</th>
                     ))}
                   </tr></thead>
@@ -525,13 +608,11 @@ export default function Dashboard() {
                             <td className="px-5 py-3 text-xs text-gray-500">{s.level || '—'}</td>
                             <td className="px-5 py-3">
                               <button
-                                onClick={async () => {
-                                  if (!confirm('Delete this student?')) return;
-                                  try { await api.deleteStudent(s.id); await loadData(); }
-                                  catch (e) { handleLoadError(e); }
-                                }}
+                                onClick={() => askDelete('student', s.id, `student "${s.name}"`)}
                                 className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
-                              >Delete</button>
+                              >
+                                Delete
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -542,6 +623,7 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* ── Books tab ─────────────────────────────────────────────────── */}
           {tab === 'books' && (
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -551,10 +633,10 @@ export default function Dashboard() {
                 </div>
                 <button onClick={() => openModal('addBook')} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">+ Add Book</button>
               </div>
-              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+              <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="bg-gray-50/70 border-b border-gray-100">
-                    {['Title','Author','Category','Total','Available','File','Actions'].map(h => (
+                    {['Title', 'Author', 'Category', 'Total', 'Available', 'File', 'Actions'].map(h => (
                       <th key={h} className="text-left text-xs font-medium text-gray-400 uppercase tracking-wide px-5 py-3">{h}</th>
                     ))}
                   </tr></thead>
@@ -581,13 +663,11 @@ export default function Dashboard() {
                               </td>
                               <td className="px-5 py-3">
                                 <button
-                                  onClick={async () => {
-                                    if (!confirm('Delete this book?')) return;
-                                    try { await api.deleteBook(b.id); await loadData(); }
-                                    catch (e) { handleLoadError(e); }
-                                  }}
+                                  onClick={() => askDelete('book', b.id, `book "${b.title}"`)}
                                   className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
-                                >Delete</button>
+                                >
+                                  Delete
+                                </button>
                               </td>
                             </tr>
                           );
@@ -599,6 +679,7 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* ── Loans tab ─────────────────────────────────────────────────── */}
           {tab === 'loans' && (
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -611,10 +692,10 @@ export default function Dashboard() {
                   <button onClick={() => openModal('returnLoan')} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">Return Book</button>
                 </div>
               </div>
-              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+              <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="bg-gray-50/70 border-b border-gray-100">
-                    {['Student','Book','Issue date','Due date','Status'].map(h => (
+                    {['Student', 'Book', 'Issue date', 'Due date', 'Status'].map(h => (
                       <th key={h} className="text-left text-xs font-medium text-gray-400 uppercase tracking-wide px-5 py-3">{h}</th>
                     ))}
                   </tr></thead>
@@ -640,16 +721,17 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* ── Availability tab ──────────────────────────────────────────── */}
           {tab === 'available' && (
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <p className="text-sm font-semibold text-gray-800">Book Availability</p>
                 <p className="text-xs text-gray-400 mt-0.5">{books.length} books tracked</p>
               </div>
-              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+              <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="bg-gray-50/70 border-b border-gray-100">
-                    {['Title','Category','Available','Total','Fill rate'].map(h => (
+                    {['Title', 'Category', 'Available', 'Total', 'Fill rate'].map(h => (
                       <th key={h} className="text-left text-xs font-medium text-gray-400 uppercase tracking-wide px-5 py-3">{h}</th>
                     ))}
                   </tr></thead>
@@ -684,7 +766,7 @@ export default function Dashboard() {
         </main>
       </div>
 
-      {/* MODALS */}
+      {/* ── Modals ────────────────────────────────────────────────────────── */}
 
       <Modal isOpen={modals.addStudent} title="Add New Student" onClose={() => closeModal('addStudent')} onSubmit={handleAddStudent} submitText="Add Student" isLoading={actionLoading}>
         {actionError && <ErrorBanner error={actionError} onDismiss={clearActionError} />}
@@ -695,26 +777,17 @@ export default function Dashboard() {
         <input type="text"          placeholder="Level"        autoComplete="off" spellCheck="false" value={studentForm.level}      onChange={e => setStudentForm(f => ({ ...f, level:      e.target.value }))} className={INPUT_CLS} />
       </Modal>
 
-      {/* Add Book — with file upload */}
       <Modal isOpen={modals.addBook} title="Add New Book" onClose={() => closeModal('addBook')} onSubmit={handleAddBook} submitText={actionLoading && uploadPct !== null ? 'Uploading…' : 'Add Book'} isLoading={actionLoading}>
         {actionError && <ErrorBanner error={actionError} onDismiss={clearActionError} />}
         <input type="text"   required placeholder="Title"        autoComplete="off" spellCheck="false" value={bookForm.title}        onChange={e => setBookForm(f => ({ ...f, title:        e.target.value }))} className={INPUT_CLS} />
         <input type="text"   required placeholder="Author"       autoComplete="off" spellCheck="false" value={bookForm.author}       onChange={e => setBookForm(f => ({ ...f, author:       e.target.value }))} className={INPUT_CLS} />
         <input type="text"           placeholder="Category"      autoComplete="off" spellCheck="false" value={bookForm.category}     onChange={e => setBookForm(f => ({ ...f, category:     e.target.value }))} className={INPUT_CLS} />
         <input type="number" required placeholder="Total Copies" autoComplete="off" min="1"            value={bookForm.total_copies} onChange={e => setBookForm(f => ({ ...f, total_copies: e.target.value }))} className={INPUT_CLS} />
-
-        {/* File upload — plain visible input */}
         <div>
           <p className="text-xs text-gray-500 mb-1.5 font-medium">Attach book file <span className="font-normal text-gray-400">(optional — PDF, DOC, DOCX, EPUB, TXT · max 50 MB)</span></p>
           <input
-            ref={bookFileRef}
-            type="file"
-            accept=".pdf,.doc,.docx,.epub,.txt"
-            onChange={handleBookFile}
-            className="block w-full text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2
-              file:mr-3 file:py-1 file:px-3 file:rounded file:border-0
-              file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700
-              hover:file:bg-emerald-100 cursor-pointer"
+            ref={bookFileRef} type="file" accept=".pdf,.doc,.docx,.epub,.txt" onChange={handleBookFile}
+            className="block w-full text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
           />
           {bookFile && (
             <div className="mt-1.5 flex items-center justify-between">

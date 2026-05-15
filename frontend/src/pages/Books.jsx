@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { ErrorBanner, useError } from '../components/ErrorBanner.jsx';
 import { LoadingOverlay } from '../components/LoadingOverlay.jsx';
+import { useDataFetch } from '../hooks/useDataFetch.js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
@@ -63,28 +64,14 @@ async function uploadToSupabase(file) {
 }
 
 export default function Books() {
-  const [list, setList]           = useState([]);
+  const { data: list, loading: dataLoading, error, refetch } = useDataFetch(() => api.listBooks(), 5000); // Auto-refresh every 5 seconds
   const [form, setForm]           = useState(EMPTY);
   const [file, setFile]           = useState(null);  // File object
   const [loading, setLoading]     = useState(false);
-  const [dataLoading, setDataLoading] = useState(true);
   const [uploadPct, setUploadPct] = useState(null);  // null | 0-100
   const fileRef = useRef();
 
-  const { error, handleError, clear } = useError();
-
-  const load = async () => {
-    try {
-      const data = await api.listBooks();
-      setList(data);
-    } catch (e) {
-      handleError(e);
-    }
-  };
-
-  useEffect(() => {
-    load().finally(() => setDataLoading(false));
-  }, []);
+  const { handleError, clear } = useError();
 
   const handleFile = (e) => {
     const f = e.target.files?.[0];
@@ -123,7 +110,8 @@ export default function Books() {
       setForm(EMPTY);
       setFile(null);
       if (fileRef.current) fileRef.current.value = '';
-      await load();
+      // Refresh data immediately
+      await refetch();
     } catch (e) {
       handleError(e);
     } finally {
@@ -136,7 +124,8 @@ export default function Books() {
     if (!confirm('Delete this book?')) return;
     try {
       await api.deleteBook(id);
-      await load();
+      // Refresh data immediately after deletion
+      await refetch();
     } catch (e) {
       handleError(e);
     }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { api } from '../api.js';
 import { ErrorBanner, useError } from '../components/ErrorBanner.jsx';
 import { LoadingOverlay } from '../components/LoadingOverlay.jsx';
@@ -27,6 +27,7 @@ export default function Loans() {
   const [form,     setForm]     = useState(EMPTY);
   const [loading,  setLoading]  = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
+  const autoRefreshRef = useRef(null);
 
   // Per-action error (form submissions, return button)
   const { error: actionError, handleError: handleActionError, clear: clearActionError } = useError();
@@ -34,15 +35,6 @@ export default function Loans() {
   const { error: loadError, handleError: handleLoadError, clear: clearLoadError } = useError();
 
   // ── Data loading ────────────────────────────────────────────────────────────
-
-  const loadLoans = async () => {
-    try {
-      const data = await api.listLoans();
-      setLoans(data);
-    } catch (e) {
-      handleLoadError(e);
-    }
-  };
 
   const loadAll = async () => {
     setDataLoading(true);
@@ -62,7 +54,18 @@ export default function Loans() {
     }
   };
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { 
+    loadAll();
+    
+    // Set up auto-refresh every 5 seconds
+    autoRefreshRef.current = setInterval(() => {
+      loadAll();
+    }, 5000);
+    
+    return () => {
+      if (autoRefreshRef.current) clearInterval(autoRefreshRef.current);
+    };
+  }, []);
 
   // ── Derived: books with availability meta ───────────────────────────────────
   // For books with 0 copies available, find the earliest due date from active loans
@@ -101,7 +104,8 @@ export default function Loans() {
         due_date:   form.due_date,
       });
       setForm(EMPTY);
-      await loadAll(); // refresh books (available_copies changed) + loans
+      // Refresh data immediately after issuing
+      await loadAll();
     } catch (e) {
       handleActionError(e);
     } finally {
@@ -114,7 +118,8 @@ export default function Loans() {
     const today = new Date().toISOString().slice(0, 10);
     try {
       await api.returnLoan(loan.id, today);
-      await loadAll(); // refresh both loans + books
+      // Refresh data immediately after returning
+      await loadAll();
     } catch (e) {
       handleActionError(e);
     }

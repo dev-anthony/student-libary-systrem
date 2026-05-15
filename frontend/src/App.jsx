@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Dashboard from './pages/Dashboard.jsx';
 import Students from './pages/Students.jsx';
 import Books from './pages/Books.jsx';
@@ -12,7 +12,16 @@ const PAGES = [
 ];
 
 export default function App() {
-  const [page, setPage] = useState('dashboard');
+  const [page, setPage] = useState(() => {
+    // Restore page from localStorage on app load
+    const saved = localStorage.getItem('currentPage');
+    return saved && PAGES.some(p => p.key === saved) ? saved : 'dashboard';
+  });
+
+  // Save page to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('currentPage', page);
+  }, [page]);
 
   return (
     <div className="min-h-screen bg-gray-50">
