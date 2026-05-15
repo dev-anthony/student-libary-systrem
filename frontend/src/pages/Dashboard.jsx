@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { ErrorBanner, useError } from '../components/ErrorBanner.jsx';
 import { LoadingOverlay } from '../components/LoadingOverlay.jsx';
@@ -7,6 +7,59 @@ import {
   ResponsiveContainer, Legend
 } from 'recharts';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
+const BUCKET = 'book-files';
+
+const ACCEPTED = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/epub+zip',
+  'text/plain',
+];
+
+async function uploadToSupabase(file) {
+  const safeName = file.name.replace(/[^a-z0-9.\-_]/gi, '_');
+  const filename = `${Date.now()}_${safeName}`;
+
+  // Strip any trailing path (e.g. /rest/v1) — we only want https://xxx.supabase.co
+  const base = SUPABASE_URL.replace(/\/(rest|storage)\/.*$/, '');
+
+  const res = await fetch(
+    `${base}/storage/v1/object/${BUCKET}/${filename}`,
+    {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-upsert': 'true',
+      },
+      body: file,
+    }
+  );
+  if (!res.ok) {
+    let msg = `Upload failed (${res.status})`;
+    try { const b = await res.json(); msg = b.message || b.error || msg; } catch (_) {}
+    throw new Error(msg);
+  }
+  return `${base}/storage/v1/object/public/${BUCKET}/${filename}`;
+}
+
+function fileLabel(url) {
+  if (!url) return null;
+  const ext = url.split('?')[0].split('.').pop().toUpperCase();
+  const map = {
+    PDF:  { label: 'PDF',  color: 'bg-red-50 text-red-600 ring-red-200' },
+    DOC:  { label: 'DOC',  color: 'bg-blue-50 text-blue-600 ring-blue-200' },
+    DOCX: { label: 'DOCX', color: 'bg-blue-50 text-blue-600 ring-blue-200' },
+    EPUB: { label: 'EPUB', color: 'bg-purple-50 text-purple-600 ring-purple-200' },
+    TXT:  { label: 'TXT',  color: 'bg-gray-50 text-gray-600 ring-gray-200' },
+  };
+  return map[ext] || { label: ext, color: 'bg-gray-50 text-gray-600 ring-gray-200' };
+}
+
 const NAV = [
   { key: 'overview',  label: 'Overview',     icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
   { key: 'students',  label: 'Students',      icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
@@ -14,8 +67,6 @@ const NAV = [
   { key: 'loans',     label: 'Loans',         icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
   { key: 'available', label: 'Availability',  icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
 ];
-
-// ─── Tiny helpers (outside component — stable identity) ───────────────────────
 
 function Icon({ path, className = 'w-5 h-5' }) {
   return (
@@ -37,7 +88,6 @@ function AvailBadge({ pct }) {
   return               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200">{pct}%</span>;
 }
 
-// Modal OUTSIDE Dashboard — avoids remount-on-render focus loss
 function Modal({ isOpen, title, onClose, children, onSubmit, submitText = 'Submit', isLoading = false }) {
   if (!isOpen) return null;
   return (
@@ -78,8 +128,6 @@ function buildChartData(loans) {
 const INPUT_CLS  = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400';
 const SELECT_CLS = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white';
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
-
 export default function Dashboard() {
   const [students, setStudents] = useState([]);
   const [books,    setBooks]    = useState([]);
@@ -96,26 +144,22 @@ export default function Dashboard() {
   const [loanForm,    setLoanForm]    = useState({ student_id: '', book_id: '', issue_date: '', due_date: '' });
   const [returnForm,  setReturnForm]  = useState({ loan_id: '' });
 
-  // Two error channels: one for the initial data load, one for modal actions
+  // File upload state for Add Book modal
+  const [bookFile,    setBookFile]    = useState(null);
+  const [uploadPct,   setUploadPct]   = useState(null);
+  const bookFileRef = useRef();
+
   const { error: loadError,   handleError: handleLoadError,   clear: clearLoadError   } = useError();
   const { error: actionError, handleError: handleActionError, clear: clearActionError } = useError();
-
-  // ── Data ────────────────────────────────────────────────────────────────────
 
   const loadData = async () => {
     try {
       const [st, bk, ln] = await Promise.all([api.listStudents(), api.listBooks(), api.listLoans()]);
-      setStudents(st);
-      setBooks(bk);
-      setLoans(ln);
-    } catch (e) {
-      handleLoadError(e);
-    }
+      setStudents(st); setBooks(bk); setLoans(ln);
+    } catch (e) { handleLoadError(e); }
   };
 
   useEffect(() => { loadData().finally(() => setLoading(false)); }, []);
-
-  // ── Derived ─────────────────────────────────────────────────────────────────
 
   const stats = {
     students: students.length,
@@ -127,7 +171,6 @@ export default function Dashboard() {
   const chartData   = buildChartData(loans);
   const activeLoans = loans.filter(l => l.status !== 'RETURNED');
 
-  // Books split for the Issue Loan modal — available selectable, on-loan disabled with return date
   const booksWithMeta = useMemo(() =>
     books.map(book => {
       if (book.available_copies > 0) return { ...book, unavailable: false, dueBack: null };
@@ -141,21 +184,24 @@ export default function Dashboard() {
   const availableBooks   = booksWithMeta.filter(b => !b.unavailable);
   const unavailableBooks = booksWithMeta.filter(b =>  b.unavailable);
 
-  // ── Navigation ──────────────────────────────────────────────────────────────
-
   const changeTab  = (key)  => { setTab(key); setSidebar(false); };
   const openModal  = (name) => { clearActionError(); setModals(m => ({ ...m, [name]: true  })); };
-  const closeModal = (name) => { clearActionError(); setModals(m => ({ ...m, [name]: false })); };
-
-  // ── Action handlers ─────────────────────────────────────────────────────────
+  const closeModal = (name) => {
+    clearActionError();
+    setModals(m => ({ ...m, [name]: false }));
+    if (name === 'addBook') {
+      setBookFile(null);
+      setUploadPct(null);
+      if (bookFileRef.current) bookFileRef.current.value = '';
+    }
+  };
 
   const handleAddStudent = async (e) => {
     e.preventDefault(); setActionLoading(true);
     try {
       await api.createStudent(studentForm);
       setStudentForm({ student_id: '', name: '', email: '', department: '', level: '' });
-      closeModal('addStudent');
-      await loadData();
+      closeModal('addStudent'); await loadData();
     } catch (e) { handleActionError(e); }
     finally { setActionLoading(false); }
   };
@@ -163,12 +209,34 @@ export default function Dashboard() {
   const handleAddBook = async (e) => {
     e.preventDefault(); setActionLoading(true);
     try {
-      await api.createBook({ ...bookForm, total_copies: Number(bookForm.total_copies) || 1 });
+      let file_url = null;
+      if (bookFile) {
+        setUploadPct(20);
+        file_url = await uploadToSupabase(bookFile);
+        setUploadPct(100);
+      }
+      await api.createBook({ ...bookForm, total_copies: Number(bookForm.total_copies) || 1, file_url });
       setBookForm({ title: '', author: '', category: '', total_copies: 1 });
-      closeModal('addBook');
-      await loadData();
+      setBookFile(null);
+      setUploadPct(null);
+      if (bookFileRef.current) bookFileRef.current.value = '';
+      closeModal('addBook'); await loadData();
     } catch (e) { handleActionError(e); }
     finally { setActionLoading(false); }
+  };
+
+  const handleBookFile = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!ACCEPTED.includes(f.type)) {
+      handleActionError(new Error('Unsupported file. Please upload PDF, DOC, DOCX, EPUB, or TXT.'));
+      e.target.value = ''; return;
+    }
+    if (f.size > 50 * 1024 * 1024) {
+      handleActionError(new Error('File too large. Max 50 MB.'));
+      e.target.value = ''; return;
+    }
+    setBookFile(f);
   };
 
   const handleIssueLoan = async (e) => {
@@ -181,8 +249,7 @@ export default function Dashboard() {
         due_date:   loanForm.due_date,
       });
       setLoanForm({ student_id: '', book_id: '', issue_date: '', due_date: '' });
-      closeModal('issueLoan');
-      await loadData();
+      closeModal('issueLoan'); await loadData();
     } catch (e) { handleActionError(e); }
     finally { setActionLoading(false); }
   };
@@ -194,23 +261,17 @@ export default function Dashboard() {
       if (loan) {
         await api.returnLoan(loan.id, new Date().toISOString().slice(0, 10));
         setReturnForm({ loan_id: '' });
-        closeModal('returnLoan');
-        await loadData();
+        closeModal('returnLoan'); await loadData();
       }
     } catch (e) { handleActionError(e); }
     finally { setActionLoading(false); }
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
-
   return (
     <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
-
       {loading && <LoadingOverlay />}
-
       {sidebar && <div className="fixed inset-0 bg-black/30 z-20 lg:hidden" onClick={() => setSidebar(false)} />}
 
-      {/* ── Sidebar ── */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-100
         shadow-xl lg:shadow-none flex flex-col transition-transform duration-200
@@ -243,7 +304,6 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* ── Main ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-5 flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -258,11 +318,8 @@ export default function Dashboard() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-5 space-y-5">
-
-          {/* ── Network / data-load error banner (all tabs) ── */}
           {loadError && <ErrorBanner error={loadError} onDismiss={clearLoadError} />}
 
-          {/* ── OVERVIEW ── */}
           {tab === 'overview' && (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -306,8 +363,6 @@ export default function Dashboard() {
               </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-
-                {/* Students mini */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Students</p>
@@ -333,15 +388,10 @@ export default function Dashboard() {
                         ))}
                       </tbody>
                     </table>
-                    {students.length > 5 && (
-                      <div className="px-4 py-2.5 border-t border-gray-50">
-                        <button onClick={() => changeTab('students')} className="text-xs text-blue-600 hover:underline">View all {students.length} students</button>
-                      </div>
-                    )}
+                    {students.length > 5 && <div className="px-4 py-2.5 border-t border-gray-50"><button onClick={() => changeTab('students')} className="text-xs text-blue-600 hover:underline">View all {students.length} students</button></div>}
                   </div>
                 </div>
 
-                {/* Books mini */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Books</p>
@@ -370,15 +420,10 @@ export default function Dashboard() {
                         })}
                       </tbody>
                     </table>
-                    {books.length > 5 && (
-                      <div className="px-4 py-2.5 border-t border-gray-50">
-                        <button onClick={() => changeTab('books')} className="text-xs text-blue-600 hover:underline">View all {books.length} books</button>
-                      </div>
-                    )}
+                    {books.length > 5 && <div className="px-4 py-2.5 border-t border-gray-50"><button onClick={() => changeTab('books')} className="text-xs text-blue-600 hover:underline">View all {books.length} books</button></div>}
                   </div>
                 </div>
 
-                {/* Active Loans mini */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Active Loans</p>
@@ -408,15 +453,10 @@ export default function Dashboard() {
                         })}
                       </tbody>
                     </table>
-                    {activeLoans.length > 5 && (
-                      <div className="px-4 py-2.5 border-t border-gray-50">
-                        <button onClick={() => changeTab('loans')} className="text-xs text-blue-600 hover:underline">View all {activeLoans.length} loans</button>
-                      </div>
-                    )}
+                    {activeLoans.length > 5 && <div className="px-4 py-2.5 border-t border-gray-50"><button onClick={() => changeTab('loans')} className="text-xs text-blue-600 hover:underline">View all {activeLoans.length} loans</button></div>}
                   </div>
                 </div>
 
-                {/* Availability mini */}
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Book Availability</p>
@@ -449,18 +489,13 @@ export default function Dashboard() {
                         })}
                       </tbody>
                     </table>
-                    {books.length > 5 && (
-                      <div className="px-4 py-2.5 border-t border-gray-50">
-                        <button onClick={() => changeTab('available')} className="text-xs text-blue-600 hover:underline">View all</button>
-                      </div>
-                    )}
+                    {books.length > 5 && <div className="px-4 py-2.5 border-t border-gray-50"><button onClick={() => changeTab('available')} className="text-xs text-blue-600 hover:underline">View all</button></div>}
                   </div>
                 </div>
               </div>
             </>
           )}
 
-          {/* ── STUDENTS ── */}
           {tab === 'students' && (
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -496,7 +531,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── BOOKS ── */}
           {tab === 'books' && (
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -509,15 +543,16 @@ export default function Dashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="bg-gray-50/70 border-b border-gray-100">
-                    {['Title','Author','Category','Total','Available'].map(h => (
+                    {['Title','Author','Category','Total','Available','File'].map(h => (
                       <th key={h} className="text-left text-xs font-medium text-gray-400 uppercase tracking-wide px-5 py-3">{h}</th>
                     ))}
                   </tr></thead>
                   <tbody className="divide-y divide-gray-50">
                     {books.length === 0
-                      ? <tr><td colSpan={5} className="text-center py-10 text-sm text-gray-400">No books found</td></tr>
+                      ? <tr><td colSpan={6} className="text-center py-10 text-sm text-gray-400">No books found</td></tr>
                       : books.map(b => {
                           const pct = b.total_copies > 0 ? Math.round((b.available_copies / b.total_copies) * 100) : 0;
+                          const fl = fileLabel(b.file_url);
                           return (
                             <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-5 py-3 text-sm font-medium text-gray-800">{b.title}</td>
@@ -525,6 +560,14 @@ export default function Dashboard() {
                               <td className="px-5 py-3 text-xs text-gray-500">{b.category || '—'}</td>
                               <td className="px-5 py-3 text-xs text-gray-500">{b.total_copies}</td>
                               <td className="px-5 py-3"><AvailBadge pct={pct} /></td>
+                              <td className="px-5 py-3">
+                                {fl ? (
+                                  <a href={b.file_url} target="_blank" rel="noopener noreferrer"
+                                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 hover:opacity-75 transition-opacity ${fl.color}`}>
+                                    {fl.label}
+                                  </a>
+                                ) : <span className="text-xs text-gray-300">—</span>}
+                              </td>
                             </tr>
                           );
                         })
@@ -535,7 +578,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── LOANS ── */}
           {tab === 'loans' && (
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -577,7 +619,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── AVAILABILITY ── */}
           {tab === 'available' && (
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
@@ -619,13 +660,11 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
         </main>
       </div>
 
-      {/* ── MODALS ── */}
+      {/* MODALS */}
 
-      {/* Add Student */}
       <Modal isOpen={modals.addStudent} title="Add New Student" onClose={() => closeModal('addStudent')} onSubmit={handleAddStudent} submitText="Add Student" isLoading={actionLoading}>
         {actionError && <ErrorBanner error={actionError} onDismiss={clearActionError} />}
         <input type="text"  required placeholder="Student ID"  autoComplete="off" spellCheck="false" value={studentForm.student_id} onChange={e => setStudentForm(f => ({ ...f, student_id: e.target.value }))} className={INPUT_CLS} />
@@ -635,25 +674,48 @@ export default function Dashboard() {
         <input type="text"          placeholder="Level"        autoComplete="off" spellCheck="false" value={studentForm.level}      onChange={e => setStudentForm(f => ({ ...f, level:      e.target.value }))} className={INPUT_CLS} />
       </Modal>
 
-      {/* Add Book */}
-      <Modal isOpen={modals.addBook} title="Add New Book" onClose={() => closeModal('addBook')} onSubmit={handleAddBook} submitText="Add Book" isLoading={actionLoading}>
+      {/* Add Book — with file upload */}
+      <Modal isOpen={modals.addBook} title="Add New Book" onClose={() => closeModal('addBook')} onSubmit={handleAddBook} submitText={actionLoading && uploadPct !== null ? 'Uploading…' : 'Add Book'} isLoading={actionLoading}>
         {actionError && <ErrorBanner error={actionError} onDismiss={clearActionError} />}
         <input type="text"   required placeholder="Title"        autoComplete="off" spellCheck="false" value={bookForm.title}        onChange={e => setBookForm(f => ({ ...f, title:        e.target.value }))} className={INPUT_CLS} />
         <input type="text"   required placeholder="Author"       autoComplete="off" spellCheck="false" value={bookForm.author}       onChange={e => setBookForm(f => ({ ...f, author:       e.target.value }))} className={INPUT_CLS} />
         <input type="text"           placeholder="Category"      autoComplete="off" spellCheck="false" value={bookForm.category}     onChange={e => setBookForm(f => ({ ...f, category:     e.target.value }))} className={INPUT_CLS} />
         <input type="number" required placeholder="Total Copies" autoComplete="off" min="1"            value={bookForm.total_copies} onChange={e => setBookForm(f => ({ ...f, total_copies: e.target.value }))} className={INPUT_CLS} />
+
+        {/* File upload — plain visible input */}
+        <div>
+          <p className="text-xs text-gray-500 mb-1.5 font-medium">Attach book file <span className="font-normal text-gray-400">(optional — PDF, DOC, DOCX, EPUB, TXT · max 50 MB)</span></p>
+          <input
+            ref={bookFileRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.epub,.txt"
+            onChange={handleBookFile}
+            className="block w-full text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2
+              file:mr-3 file:py-1 file:px-3 file:rounded file:border-0
+              file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700
+              hover:file:bg-emerald-100 cursor-pointer"
+          />
+          {bookFile && (
+            <div className="mt-1.5 flex items-center justify-between">
+              <span className="text-xs text-emerald-700 truncate">{bookFile.name}</span>
+              <button type="button" onClick={() => { setBookFile(null); if (bookFileRef.current) bookFileRef.current.value = ''; }}
+                className="text-xs text-gray-400 hover:text-red-500 ml-2 shrink-0">✕ Remove</button>
+            </div>
+          )}
+          {uploadPct !== null && (
+            <div className="mt-2 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500 rounded-full transition-all duration-300" style={{ width: `${uploadPct}%` }} />
+            </div>
+          )}
+        </div>
       </Modal>
 
-      {/* Issue Loan */}
       <Modal isOpen={modals.issueLoan} title="Issue Book" onClose={() => closeModal('issueLoan')} onSubmit={handleIssueLoan} submitText="Issue Book" isLoading={actionLoading}>
         {actionError && <ErrorBanner error={actionError} onDismiss={clearActionError} />}
-
         <select required value={loanForm.student_id} onChange={e => setLoanForm(f => ({ ...f, student_id: e.target.value }))} className={SELECT_CLS}>
           <option value="">Select Student</option>
           {students.map(s => <option key={s.id} value={s.id}>{s.student_id} — {s.name}</option>)}
         </select>
-
-        {/* Books: available selectable, on-loan greyed-out with return date */}
         <select required value={loanForm.book_id} onChange={e => setLoanForm(f => ({ ...f, book_id: e.target.value }))} className={SELECT_CLS}>
           <option value="">Select Book</option>
           {availableBooks.length > 0 && (
@@ -672,24 +734,18 @@ export default function Dashboard() {
           )}
           {books.length === 0 && <option disabled>No books in system yet</option>}
         </select>
-
-        {/* Hint when everything is out */}
         {books.length > 0 && availableBooks.length === 0 && (
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             All books are currently on loan.
             {unavailableBooks.some(b => b.dueBack) && (
-              <> Next return expected on <strong>
-                {fmt(unavailableBooks.filter(b => b.dueBack).sort((a, b) => new Date(a.dueBack) - new Date(b.dueBack))[0]?.dueBack)}
-              </strong>.</>
+              <> Next return expected on <strong>{fmt(unavailableBooks.filter(b => b.dueBack).sort((a, b) => new Date(a.dueBack) - new Date(b.dueBack))[0]?.dueBack)}</strong>.</>
             )}
           </p>
         )}
-
         <input type="date" required value={loanForm.issue_date} onChange={e => setLoanForm(f => ({ ...f, issue_date: e.target.value }))} className={INPUT_CLS} />
         <input type="date" required value={loanForm.due_date}   onChange={e => setLoanForm(f => ({ ...f, due_date:   e.target.value }))} className={INPUT_CLS} />
       </Modal>
 
-      {/* Return Loan */}
       <Modal isOpen={modals.returnLoan} title="Return Book" onClose={() => closeModal('returnLoan')} onSubmit={handleReturnLoan} submitText="Return Book" isLoading={actionLoading}>
         {actionError && <ErrorBanner error={actionError} onDismiss={clearActionError} />}
         <select required value={returnForm.loan_id} onChange={e => setReturnForm(f => ({ ...f, loan_id: e.target.value }))} className={SELECT_CLS}>
@@ -701,7 +757,6 @@ export default function Dashboard() {
           ))}
         </select>
       </Modal>
-
     </div>
   );
 }

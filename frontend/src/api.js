@@ -7,8 +7,7 @@ const H = {
   'Prefer': 'return=representation'
 };
 
-// ─── Response helper ──────────────────────────────────────────────────────────
-// PostgREST returns JSON error objects on 4xx/5xx; surface them as real Errors.
+
 async function checkOk(res) {
   if (res.ok) return res.json();
   let msg = `Server error (${res.status})`;
@@ -41,14 +40,26 @@ export const api = {
       method: 'DELETE', headers: H
     }).then(r => { if (!r.ok) throw new Error(`Delete failed (${r.status})`); return true; }),
 
-  // ── Books ────────────────────────────────────────────────────────────────────
-  listBooks: () =>
-    fetch(`${URL}/books?order=id.desc`, { headers: H }).then(checkOk),
+  // // ── Books ────────────────────────────────────────────────────────────────────
+  // listBooks: () =>
+  //   fetch(`${URL}/books?order=id.desc`, { headers: H }).then(checkOk),
 
-  createBook: ({ title, author, category, total_copies }) =>
+  // createBook: ({ title, author, category, total_copies }) =>
+  //   fetch(`${URL}/books`, {
+  //     method: 'POST', headers: H,
+  //     body: JSON.stringify({ title, author, category, total_copies, available_copies: total_copies })
+  //   }).then(checkOk),
+   listBooks: () =>
+    fetch(`${URL}/books?order=id.desc`, { headers: H }).then(checkOk),
+ 
+  createBook: ({ title, author, category, total_copies, file_url }) =>
     fetch(`${URL}/books`, {
       method: 'POST', headers: H,
-      body: JSON.stringify({ title, author, category, total_copies, available_copies: total_copies })
+      body: JSON.stringify({
+        title, author, category, total_copies,
+        available_copies: total_copies,
+        file_url: file_url ?? null,
+      })
     }).then(checkOk),
 
   updateBook: (id, data) =>
