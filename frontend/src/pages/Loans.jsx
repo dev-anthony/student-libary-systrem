@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { ErrorBanner, useError } from '../components/ErrorBanner.jsx';
+import { LoadingOverlay } from '../components/LoadingOverlay.jsx';
 
 // ─── Helpers (outside component so identity is stable) ────────────────────────
 
@@ -123,6 +124,8 @@ export default function Loans() {
 
   return (
     <div className="space-y-5 max-w-full">
+
+      {dataLoading && <LoadingOverlay />}
 
       {/* ── Network / load errors ─────────────────────────────────────────── */}
       {loadError && (

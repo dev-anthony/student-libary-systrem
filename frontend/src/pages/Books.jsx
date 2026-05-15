@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { ErrorBanner, useError } from '../components/ErrorBanner.jsx';
+import { LoadingOverlay } from '../components/LoadingOverlay.jsx';
 
 const EMPTY = { title: '', author: '', category: '', total_copies: 1 };
 
@@ -7,27 +9,52 @@ export default function Books() {
   const [list, setList]   = useState([]);
   const [form, setForm]   = useState(EMPTY);
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
+  
+  const { error, handleError, clear } = useError();
 
-  const load = () => api.listBooks().then(setList);
-  useEffect(() => { load(); }, []);
+  const load = async () => {
+    try {
+      const data = await api.listBooks();
+      setList(data);
+    } catch (e) {
+      handleError(e);
+    }
+  };
+
+  useEffect(() => { 
+    load().finally(() => setDataLoading(false)); 
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    await api.createBook({ ...form, total_copies: Number(form.total_copies) || 1 });
-    setForm(EMPTY);
-    await load();
-    setLoading(false);
+    try {
+      await api.createBook({ ...form, total_copies: Number(form.total_copies) || 1 });
+      setForm(EMPTY);
+      await load();
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const remove = async (id) => {
     if (!confirm('Delete this book?')) return;
-    await api.deleteBook(id);
-    load();
+    try {
+      await api.deleteBook(id);
+      await load();
+    } catch (e) {
+      handleError(e);
+    }
   };
 
   return (
     <div className="space-y-5 max-w-full">
+      {dataLoading && <LoadingOverlay />}
+
+      {error && <ErrorBanner error={error} onDismiss={clear} />}
       {/* Add form */}
       <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">
         <p className="text-sm font-semibold text-gray-800 mb-4">Add Book</p>

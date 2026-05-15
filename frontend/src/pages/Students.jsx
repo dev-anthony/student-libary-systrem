@@ -1,33 +1,60 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { ErrorBanner, useError } from '../components/ErrorBanner.jsx';
+import { LoadingOverlay } from '../components/LoadingOverlay.jsx';
 
-// const EMPTY = { student_id: '', name: '', email: '', department: '', level: '' };
+const EMPTY = { student_id: '', name: '', email: '', department: '', level: '' };
 
 export default function Students() {
   const [list, setList] = useState([]);
-  const [form, setForm] = useState({ student_id: '', name: '', email: '', department: '', level: '' });
+  const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
+  
+  const { error, handleError, clear } = useError();
 
-  const load = () => api.listStudents().then(setList);
-  useEffect(() => { load(); }, []);
+  const load = async () => {
+    try {
+      const data = await api.listStudents();
+      setList(data);
+    } catch (e) {
+      handleError(e);
+    }
+  };
+
+  useEffect(() => { 
+    load().finally(() => setDataLoading(false)); 
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    await api.createStudent(form);
-    setForm(EMPTY);
-    await load();
-    setLoading(false);
+    try {
+      await api.createStudent(form);
+      setForm(EMPTY);
+      await load();
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const remove = async (id) => {
     if (!confirm('Delete this student?')) return;
-    await api.deleteStudent(id);
-    load();
+    try {
+      await api.deleteStudent(id);
+      await load();
+    } catch (e) {
+      handleError(e);
+    }
   };
 
   return (
     <div className="space-y-5 max-w-full">
+      {dataLoading && <LoadingOverlay />}
+
+      {error && <ErrorBanner error={error} onDismiss={clear} />}
       {/* Add form */}
       <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">
         <p className="text-sm font-semibold text-gray-800 mb-4">Add Student</p>

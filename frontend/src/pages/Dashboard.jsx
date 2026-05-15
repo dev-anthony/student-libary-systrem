@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { ErrorBanner, useError } from '../components/ErrorBanner.jsx';
+import { LoadingOverlay } from '../components/LoadingOverlay.jsx';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend
@@ -204,6 +205,8 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
+
+      {loading && <LoadingOverlay />}
 
       {sidebar && <div className="fixed inset-0 bg-black/30 z-20 lg:hidden" onClick={() => setSidebar(false)} />}
 
