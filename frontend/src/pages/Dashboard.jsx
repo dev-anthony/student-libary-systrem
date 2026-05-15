@@ -83,9 +83,10 @@ function StatusBadge({ status, overdue }) {
 }
 
 function AvailBadge({ pct }) {
-  if (pct > 50) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 ring-1 ring-green-200">{pct}%</span>;
-  if (pct > 20) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">{pct}%</span>;
-  return               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200">{pct}%</span>;
+  if (pct === 0) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200">Issued out</span>;
+  if (pct > 50)  return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 ring-1 ring-green-200">{pct}%</span>;
+  if (pct > 20)  return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">{pct}%</span>;
+  return                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 ring-1 ring-red-200">{pct}%</span>;
 }
 
 function Modal({ isOpen, title, onClose, children, onSubmit, submitText = 'Submit', isLoading = false }) {
@@ -505,16 +506,16 @@ export default function Dashboard() {
                 </div>
                 <button onClick={() => openModal('addStudent')} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">+ Add Student</button>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
                 <table className="w-full">
                   <thead><tr className="bg-gray-50/70 border-b border-gray-100">
-                    {['Student ID','Name','Email','Department','Level'].map(h => (
+                    {['Student ID','Name','Email','Department','Level','Actions'].map(h => (
                       <th key={h} className="text-left text-xs font-medium text-gray-400 uppercase tracking-wide px-5 py-3">{h}</th>
                     ))}
                   </tr></thead>
                   <tbody className="divide-y divide-gray-50">
                     {students.length === 0
-                      ? <tr><td colSpan={5} className="text-center py-10 text-sm text-gray-400">No students found</td></tr>
+                      ? <tr><td colSpan={6} className="text-center py-10 text-sm text-gray-400">No students found</td></tr>
                       : students.map(s => (
                           <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
                             <td className="px-5 py-3 text-xs"><span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">{s.student_id}</span></td>
@@ -522,6 +523,16 @@ export default function Dashboard() {
                             <td className="px-5 py-3 text-xs text-gray-500">{s.email || '—'}</td>
                             <td className="px-5 py-3 text-xs text-gray-500">{s.department || '—'}</td>
                             <td className="px-5 py-3 text-xs text-gray-500">{s.level || '—'}</td>
+                            <td className="px-5 py-3">
+                              <button
+                                onClick={async () => {
+                                  if (!confirm('Delete this student?')) return;
+                                  try { await api.deleteStudent(s.id); await loadData(); }
+                                  catch (e) { handleLoadError(e); }
+                                }}
+                                className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                              >Delete</button>
+                            </td>
                           </tr>
                         ))
                     }
@@ -540,16 +551,16 @@ export default function Dashboard() {
                 </div>
                 <button onClick={() => openModal('addBook')} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">+ Add Book</button>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
                 <table className="w-full">
                   <thead><tr className="bg-gray-50/70 border-b border-gray-100">
-                    {['Title','Author','Category','Total','Available','File'].map(h => (
+                    {['Title','Author','Category','Total','Available','File','Actions'].map(h => (
                       <th key={h} className="text-left text-xs font-medium text-gray-400 uppercase tracking-wide px-5 py-3">{h}</th>
                     ))}
                   </tr></thead>
                   <tbody className="divide-y divide-gray-50">
                     {books.length === 0
-                      ? <tr><td colSpan={6} className="text-center py-10 text-sm text-gray-400">No books found</td></tr>
+                      ? <tr><td colSpan={7} className="text-center py-10 text-sm text-gray-400">No books found</td></tr>
                       : books.map(b => {
                           const pct = b.total_copies > 0 ? Math.round((b.available_copies / b.total_copies) * 100) : 0;
                           const fl = fileLabel(b.file_url);
@@ -567,6 +578,16 @@ export default function Dashboard() {
                                     {fl.label}
                                   </a>
                                 ) : <span className="text-xs text-gray-300">—</span>}
+                              </td>
+                              <td className="px-5 py-3">
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm('Delete this book?')) return;
+                                    try { await api.deleteBook(b.id); await loadData(); }
+                                    catch (e) { handleLoadError(e); }
+                                  }}
+                                  className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                >Delete</button>
                               </td>
                             </tr>
                           );
@@ -590,7 +611,7 @@ export default function Dashboard() {
                   <button onClick={() => openModal('returnLoan')} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">Return Book</button>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
                 <table className="w-full">
                   <thead><tr className="bg-gray-50/70 border-b border-gray-100">
                     {['Student','Book','Issue date','Due date','Status'].map(h => (
@@ -625,7 +646,7 @@ export default function Dashboard() {
                 <p className="text-sm font-semibold text-gray-800">Book Availability</p>
                 <p className="text-xs text-gray-400 mt-0.5">{books.length} books tracked</p>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
                 <table className="w-full">
                   <thead><tr className="bg-gray-50/70 border-b border-gray-100">
                     {['Title','Category','Available','Total','Fill rate'].map(h => (
