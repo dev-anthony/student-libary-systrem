@@ -11,8 +11,6 @@ export default function Books() {
   const load = () => api.listBooks().then(setList);
   useEffect(() => { load(); }, []);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -31,27 +29,27 @@ export default function Books() {
   return (
     <div className="space-y-5 max-w-full">
       {/* Add form */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">
         <p className="text-sm font-semibold text-gray-800 mb-4">Add Book</p>
         <form onSubmit={submit} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <input
-            required placeholder="Title"
-            value={form.title} onChange={e => set('title', e.target.value)}
+            type="text" required placeholder="Title" autoComplete="off" spellCheck="false"
+            value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
             className="col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <input
-            required placeholder="Author"
-            value={form.author} onChange={e => set('author', e.target.value)}
+            type="text" required placeholder="Author" autoComplete="off" spellCheck="false"
+            value={form.author} onChange={e => setForm(f => ({ ...f, author: e.target.value }))}
             className="col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <input
-            placeholder="Category"
-            value={form.category} onChange={e => set('category', e.target.value)}
+            type="text" placeholder="Category" autoComplete="off" spellCheck="false"
+            value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
             className="col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <input
-            required type="number" min="1" placeholder="Total Copies"
-            value={form.total_copies} onChange={e => set('total_copies', e.target.value)}
+            required type="number" min="1" placeholder="Total Copies" autoComplete="off"
+            value={form.total_copies} onChange={e => setForm(f => ({ ...f, total_copies: e.target.value }))}
             className="col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <button
@@ -64,7 +62,7 @@ export default function Books() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-800">All Books</p>
           <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{list.length} records</span>

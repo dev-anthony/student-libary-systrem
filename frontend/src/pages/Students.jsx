@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 
-const EMPTY = { student_id: '', name: '', email: '', department: '', level: '' };
+// const EMPTY = { student_id: '', name: '', email: '', department: '', level: '' };
 
 export default function Students() {
   const [list, setList] = useState([]);
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState({ student_id: '', name: '', email: '', department: '', level: '' });
   const [loading, setLoading] = useState(false);
 
   const load = () => api.listStudents().then(setList);
   useEffect(() => { load(); }, []);
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -31,32 +29,32 @@ export default function Students() {
   return (
     <div className="space-y-5 max-w-full">
       {/* Add form */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">
         <p className="text-sm font-semibold text-gray-800 mb-4">Add Student</p>
         <form onSubmit={submit} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <input
-            required placeholder="Student No."
-            value={form.student_id} onChange={e => set('student_id', e.target.value)}
+            type="text" required placeholder="Student No." 
+            value={form.student_id} onChange={e => setForm(f => ({ ...f, student_id: e.target.value }))}
             className="col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <input
-            required placeholder="Name"
-            value={form.name} onChange={e => set('name', e.target.value)}
+            type="text" required placeholder="Name" autoComplete="off" spellCheck="false"
+            value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
             className="col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <input
-            required type="email" placeholder="Email"
-            value={form.email} onChange={e => set('email', e.target.value)}
+            required type="email" placeholder="Email" autoComplete="off" spellCheck="false"
+            value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
             className="col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <input
-            placeholder="Department"
-            value={form.department} onChange={e => set('department', e.target.value)}
+            type="text" placeholder="Department" autoComplete="off" spellCheck="false"
+            value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
             className="col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <input
-            placeholder="Level"
-            value={form.level} onChange={e => set('level', e.target.value)}
+            type="text" placeholder="Level" autoComplete="off" spellCheck="false"
+            value={form.level} onChange={e => setForm(f => ({ ...f, level: e.target.value }))}
             className="col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <button
@@ -69,7 +67,7 @@ export default function Students() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-800">All Students</p>
           <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{list.length} records</span>
